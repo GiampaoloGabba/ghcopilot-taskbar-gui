@@ -58,6 +58,7 @@ public sealed partial class TrayMenuWindow : Window
     private static readonly nint WS_POPUP = unchecked((nint)0x80000000L);
 
     private readonly AppWindow _appWindow;
+    private readonly AiProviderSettings _settings;
     private bool _isAlwaysOnTopChecked;
     private bool _showTimestampsChecked;
     private AiProvider _selectedProvider;
@@ -67,6 +68,8 @@ public sealed partial class TrayMenuWindow : Window
     public event Action<bool>? AlwaysOnTopToggled;
     public event Action<bool>? ShowTimestampsToggled;
     public event Action<AiProvider>? ProviderChanged;
+    public event Action<ClaudeModel>? ClaudeModelChanged;
+    public event Action<bool>? ClaudeSkipPermissionsToggled;
     public event Action? ExitRequested;
 
     public TrayMenuWindow()
@@ -108,7 +111,8 @@ public sealed partial class TrayMenuWindow : Window
         ExtendsContentIntoTitleBar = true;
         _appWindow.IsShownInSwitchers = false;
 
-        _selectedProvider = AiProviderSettings.Load().ActiveProvider;
+        _settings = AiProviderSettings.Load();
+        _selectedProvider = _settings.ActiveProvider;
 
         this.Activated += OnActivated;
 
@@ -143,6 +147,43 @@ public sealed partial class TrayMenuWindow : Window
                 ProviderChanged?.Invoke(AiProvider.ClaudeCode);
             }
         });
+
+        // Claude-specific options (only visible when Claude is selected)
+        if (_selectedProvider == AiProvider.ClaudeCode)
+        {
+            AddSeparator();
+
+            // Model selection submenu
+            AddSubLabel("Model");
+            AddRadioMenuItem("\uE943", "Sonnet", _settings.ClaudeModel == ClaudeModel.Sonnet, () =>
+            {
+                _settings.ClaudeModel = ClaudeModel.Sonnet;
+                _settings.Save();
+                Hide();
+                ClaudeModelChanged?.Invoke(ClaudeModel.Sonnet);
+            });
+            AddRadioMenuItem("\uE943", "Opus", _settings.ClaudeModel == ClaudeModel.Opus, () =>
+            {
+                _settings.ClaudeModel = ClaudeModel.Opus;
+                _settings.Save();
+                Hide();
+                ClaudeModelChanged?.Invoke(ClaudeModel.Opus);
+            });
+            AddRadioMenuItem("\uE943", "Haiku", _settings.ClaudeModel == ClaudeModel.Haiku, () =>
+            {
+                _settings.ClaudeModel = ClaudeModel.Haiku;
+                _settings.Save();
+                Hide();
+                ClaudeModelChanged?.Invoke(ClaudeModel.Haiku);
+            });
+
+            AddToggleMenuItem("\uE785", "Skip Permissions", _settings.ClaudeSkipPermissions, isChecked =>
+            {
+                _settings.ClaudeSkipPermissions = isChecked;
+                _settings.Save();
+                ClaudeSkipPermissionsToggled?.Invoke(isChecked);
+            });
+        }
 
         AddSeparator();
 
@@ -310,6 +351,17 @@ public sealed partial class TrayMenuWindow : Window
         MenuItems.Children.Add(btn);
     }
 
+    private void AddSubLabel(string label)
+    {
+        MenuItems.Children.Add(new TextBlock
+        {
+            Text = label,
+            FontSize = 11,
+            Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+            Margin = new Thickness(12, 4, 0, 0)
+        });
+    }
+
     private void AddSeparator()
     {
         MenuItems.Children.Add(new Border
@@ -367,6 +419,7 @@ public sealed partial class TrayMenuWindow : Window
             var child = MenuItems.Children[i];
             if (child is Button) height += 32;
             else if (child is Border) height += 7;
+            else if (child is TextBlock) height += 22;
             if (i < childCount - 1) height += 1; // StackPanel.Spacing
         }
         return height;

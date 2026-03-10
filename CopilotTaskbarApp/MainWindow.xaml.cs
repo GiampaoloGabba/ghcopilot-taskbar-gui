@@ -456,6 +456,40 @@ public sealed partial class MainWindow : Window
             {
                 DispatcherQueue.TryEnqueue(() => SwitchProviderAsync(provider));
             };
+            _trayMenu.ClaudeModelChanged += (model) =>
+            {
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    var modelName = model switch
+                    {
+                        ClaudeModel.Opus => "Opus",
+                        ClaudeModel.Haiku => "Haiku",
+                        _ => "Sonnet"
+                    };
+                    AddMessage(new ChatMessage
+                    {
+                        Role = "system",
+                        Content = $"Claude model changed to {modelName}.",
+                        Timestamp = DateTime.Now,
+                        AvatarImagePath = _copilotAvatarPath
+                    });
+                });
+            };
+            _trayMenu.ClaudeSkipPermissionsToggled += (skip) =>
+            {
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    AddMessage(new ChatMessage
+                    {
+                        Role = "system",
+                        Content = skip
+                            ? "Permissions skipping enabled. Claude will auto-approve all tool use."
+                            : "Permissions skipping disabled. Claude may fail on operations requiring permissions.",
+                        Timestamp = DateTime.Now,
+                        AvatarImagePath = _copilotAvatarPath
+                    });
+                });
+            };
             _trayMenu.ExitRequested += () => DispatcherQueue.TryEnqueue(() =>
             {
                 _isExiting = true;
@@ -854,9 +888,9 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private static IAiService CreateAiService(AiProvider provider) => provider switch
+    private IAiService CreateAiService(AiProvider provider) => provider switch
     {
-        AiProvider.ClaudeCode => new ClaudeCodeService(),
+        AiProvider.ClaudeCode => new ClaudeCodeService(_providerSettings),
         _ => new CopilotService()
     };
 

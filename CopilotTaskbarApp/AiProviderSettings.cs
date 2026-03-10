@@ -11,9 +11,18 @@ public enum AiProvider
     ClaudeCode
 }
 
+public enum ClaudeModel
+{
+    Sonnet,
+    Opus,
+    Haiku
+}
+
 public class AiProviderSettings
 {
     public AiProvider ActiveProvider { get; set; } = AiProvider.GitHubCopilot;
+    public ClaudeModel ClaudeModel { get; set; } = ClaudeModel.Sonnet;
+    public bool ClaudeSkipPermissions { get; set; } = false;
 
     private static readonly string SettingsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),

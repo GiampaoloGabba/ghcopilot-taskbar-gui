@@ -10,7 +10,21 @@ namespace CopilotTaskbarApp;
 
 public class ClaudeCodeService : IAiService
 {
+    private readonly AiProviderSettings _settings;
+
+    public ClaudeCodeService(AiProviderSettings settings)
+    {
+        _settings = settings;
+    }
+
     public string ProviderName => "Claude Code";
+
+    private string ModelFlag => _settings.ClaudeModel switch
+    {
+        ClaudeModel.Opus => "opus",
+        ClaudeModel.Haiku => "haiku",
+        _ => "sonnet"
+    };
 
     public async Task<string> GetResponseAsync(string prompt, string? context = null, string? imageBase64 = null, List<ChatMessage>? recentMessages = null, CancellationToken cancellationToken = default)
     {
@@ -27,25 +41,9 @@ public class ClaudeCodeService : IAiService
 
             var systemPrompt = BuildSystemPrompt(context);
 
-            var args = new StringBuilder();
-            args.Append("-p ");
-            args.Append("--output-format text ");
-            args.Append("--max-turns 1 ");
-            args.Append("--no-session-persistence ");
-
-            if (!string.IsNullOrEmpty(systemPrompt))
-            {
-                args.Append("--append-system-prompt ");
-                args.Append(EscapeArgument(systemPrompt));
-                args.Append(' ');
-            }
-
-            args.Append(EscapeArgument(fullPrompt));
-
             var psi = new ProcessStartInfo
             {
                 FileName = "claude",
-                Arguments = args.ToString(),
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
@@ -54,7 +52,29 @@ public class ClaudeCodeService : IAiService
                 StandardErrorEncoding = Encoding.UTF8
             };
 
-            System.Diagnostics.Debug.WriteLine($"[ClaudeCodeService] Launching: claude {args}");
+            psi.ArgumentList.Add("-p");
+            psi.ArgumentList.Add("--output-format");
+            psi.ArgumentList.Add("text");
+            psi.ArgumentList.Add("--max-turns");
+            psi.ArgumentList.Add("1");
+            psi.ArgumentList.Add("--no-session-persistence");
+            psi.ArgumentList.Add("--model");
+            psi.ArgumentList.Add(ModelFlag);
+
+            if (_settings.ClaudeSkipPermissions)
+            {
+                psi.ArgumentList.Add("--dangerously-skip-permissions");
+            }
+
+            if (!string.IsNullOrEmpty(systemPrompt))
+            {
+                psi.ArgumentList.Add("--append-system-prompt");
+                psi.ArgumentList.Add(systemPrompt);
+            }
+
+            psi.ArgumentList.Add(fullPrompt);
+
+            System.Diagnostics.Debug.WriteLine($"[ClaudeCodeService] Launching: claude (model={ModelFlag}, skipPerms={_settings.ClaudeSkipPermissions})");
 
             var sendStart = DateTime.UtcNow;
             using var process = Process.Start(psi);
@@ -141,12 +161,18 @@ public class ClaudeCodeService : IAiService
             var psi = new ProcessStartInfo
             {
                 FileName = "claude",
-                Arguments = "-p --max-turns 1 --no-session-persistence --output-format text \"Say OK\"",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
+            psi.ArgumentList.Add("-p");
+            psi.ArgumentList.Add("--max-turns");
+            psi.ArgumentList.Add("1");
+            psi.ArgumentList.Add("--no-session-persistence");
+            psi.ArgumentList.Add("--output-format");
+            psi.ArgumentList.Add("text");
+            psi.ArgumentList.Add("Say OK");
 
             using var process = Process.Start(psi);
             if (process == null) return false;
@@ -222,12 +248,4 @@ public class ClaudeCodeService : IAiService
         return sb.ToString();
     }
 
-    private static string EscapeArgument(string arg)
-    {
-        // Wrap in double quotes and escape internal double quotes and backslashes
-        var escaped = arg
-            .Replace("\\", "\\\\")
-            .Replace("\"", "\\\"");
-        return $"\"{escaped}\"";
-    }
 }
