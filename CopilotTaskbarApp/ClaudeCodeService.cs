@@ -141,9 +141,7 @@ public class ClaudeCodeService : IAiService
         }
         catch (System.ComponentModel.Win32Exception)
         {
-            return "Claude Code CLI ('claude') not found.\n\n" +
-                   "Install it with: npm install -g @anthropic-ai/claude-code\n\n" +
-                   "Then restart this application.";
+            return "Claude Code CLI ('claude') not found. Make sure it is installed and available in your PATH.";
         }
         catch (Exception ex)
         {
