@@ -7,8 +7,9 @@ using GitHub.Copilot.SDK;
 
 namespace CopilotTaskbarApp;
 
-public class CopilotService : IAsyncDisposable
+public class CopilotService : IAiService
 {
+    public string ProviderName => "GitHub Copilot";
     private readonly CopilotClient _client;
     private readonly SemaphoreSlim _startLock = new(1, 1);
     private bool _isStarted;
@@ -187,7 +188,7 @@ public class CopilotService : IAsyncDisposable
             System.Diagnostics.Debug.WriteLine($"[CopilotService] ERROR after {totalElapsed.TotalSeconds:F2}s: {ex.GetType().Name}");
             System.Diagnostics.Debug.WriteLine($"[CopilotService] {ex.Message}");
             
-            var message = ex.Message.ToLower();
+            var message = ex.Message.ToLowerInvariant();
             if (message.Contains("auth") || message.Contains("login") || message.Contains("unauthorized"))
             {
                 return "Authentication required.\n\n" +

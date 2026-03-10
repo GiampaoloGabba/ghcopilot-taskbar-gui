@@ -19,9 +19,10 @@ namespace CopilotTaskbarApp;
 public sealed partial class MainWindow : Window
 {
     private readonly ObservableCollection<ChatMessage> _messages = new();
-    private readonly CopilotService _copilotService;
+    private IAiService _aiService;
     private readonly ContextService _contextService;
     private readonly PersistenceService _persistenceService;
+    private readonly AiProviderSettings _providerSettings;
     private WinForms.NotifyIcon? _notifyIcon;
     
     // Avatar images
@@ -56,7 +57,8 @@ public sealed partial class MainWindow : Window
         // Handle closing event to minimize to tray instead of exit
         _appWindow.Closing += AppWindow_Closing;
 
-        _copilotService = new CopilotService();
+        _providerSettings = AiProviderSettings.Load();
+        _aiService = CreateAiService(_providerSettings.ActiveProvider);
         _contextService = new ContextService();
         _persistenceService = new PersistenceService();
         
@@ -69,7 +71,7 @@ public sealed partial class MainWindow : Window
         InitializeCopilot();
         LoadAvatarImages();
         
-        Title = "GitHub Copilot Chat";
+        Title = $"{_aiService.ProviderName} Chat";
         
         // Use DesktopAcrylic for "Start Menu" like transparency
         // This requires Windows 10 1809+ (Build 17763)
@@ -343,22 +345,37 @@ public sealed partial class MainWindow : Window
     {
         try
         {
-            var isAuthenticated = await _copilotService.CheckAuthenticationAsync();
+            var isAuthenticated = await _aiService.CheckAuthenticationAsync();
             
             if (!isAuthenticated)
             {
-                var authInstructions = "To authenticate:\n" +
+                string authInstructions;
+                string helpUrl;
+
+                if (_providerSettings.ActiveProvider == AiProvider.ClaudeCode)
+                {
+                    authInstructions = "To authenticate with Claude Code:\n" +
+                                     "1. Run in terminal: claude login\n" +
+                                     "2. Or set your API key: set ANTHROPIC_API_KEY=your_key\n" +
+                                     "3. Restart this application";
+                    helpUrl = "https://docs.anthropic.com/en/docs/claude-code";
+                }
+                else
+                {
+                    authInstructions = "To authenticate:\n" +
                                      "1. Run in terminal: gh auth login\n" +
                                      "2. Select 'GitHub.com' -> 'Login with a web browser'\n" +
                                      "3. Follow the prompts to authorize 'GitHub Copilot'\n" +
                                      "4. Restart this application";
+                    helpUrl = "https://docs.github.com/en/copilot/cli";
+                }
 
                 var welcomeMessage = new ChatMessage
                 {
-                    Role = "system", // Change to system to hide copy button
-                    Content = "Not authenticated with GitHub Copilot.\n\n" +
+                    Role = "system",
+                    Content = $"Not authenticated with {_aiService.ProviderName}.\n\n" +
                              authInstructions + "\n\n" +
-                             "Need help? Visit: https://docs.github.com/en/copilot/cli",
+                             $"Need help? Visit: {helpUrl}",
                     Timestamp = DateTime.Now,
                     AvatarImagePath = _copilotAvatarPath
                 };
@@ -386,7 +403,7 @@ public sealed partial class MainWindow : Window
     private async void OnWindowClosed(object sender, WindowEventArgs args)
     {
         _notifyIcon?.Dispose();
-        await _copilotService.DisposeAsync();
+        await _aiService.DisposeAsync();
     }
 
     private TrayMenuWindow? _trayMenu;
@@ -397,7 +414,7 @@ public sealed partial class MainWindow : Window
         {
             _notifyIcon = new WinForms.NotifyIcon
             {
-                Text = "GitHub Copilot Chat",
+                Text = $"{_aiService.ProviderName} Chat",
                 Visible = true
             };
 
@@ -434,6 +451,44 @@ public sealed partial class MainWindow : Window
             _trayMenu.ShowTimestampsToggled += (show) =>
             {
                 DispatcherQueue.TryEnqueue(() => ToggleTimestamps(show));
+            };
+            _trayMenu.ProviderChanged += (provider) =>
+            {
+                DispatcherQueue.TryEnqueue(() => SwitchProviderAsync(provider));
+            };
+            _trayMenu.ClaudeModelChanged += (model) =>
+            {
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    var modelName = model switch
+                    {
+                        ClaudeModel.Opus => "Opus",
+                        ClaudeModel.Haiku => "Haiku",
+                        _ => "Sonnet"
+                    };
+                    AddMessage(new ChatMessage
+                    {
+                        Role = "system",
+                        Content = $"Claude model changed to {modelName}.",
+                        Timestamp = DateTime.Now,
+                        AvatarImagePath = _copilotAvatarPath
+                    });
+                });
+            };
+            _trayMenu.ClaudeSkipPermissionsToggled += (skip) =>
+            {
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    AddMessage(new ChatMessage
+                    {
+                        Role = "system",
+                        Content = skip
+                            ? "Permissions skipping enabled. Claude will auto-approve all tool use."
+                            : "Permissions skipping disabled. Claude may fail on operations requiring permissions.",
+                        Timestamp = DateTime.Now,
+                        AvatarImagePath = _copilotAvatarPath
+                    });
+                });
             };
             _trayMenu.ExitRequested += () => DispatcherQueue.TryEnqueue(() =>
             {
@@ -635,7 +690,7 @@ public sealed partial class MainWindow : Window
                     ? _messages.Take(_messages.Count - 2).ToList() 
                     : null;
                 
-                var responseTask = _copilotService.GetResponseAsync(input, currentContext, screenshot, recentMessages);
+                var responseTask = _aiService.GetResponseAsync(input, currentContext, screenshot, recentMessages);
                 var timeoutTask = Task.Delay(TimeSpan.FromSeconds(300));
                 
                 var completedTask = await Task.WhenAny(responseTask, timeoutTask);
@@ -830,6 +885,55 @@ public sealed partial class MainWindow : Window
         if (start < line.Length)
         {
             paragraph.Inlines.Add(new Run { Text = line[start..] });
+        }
+    }
+
+    private IAiService CreateAiService(AiProvider provider) => provider switch
+    {
+        AiProvider.ClaudeCode => new ClaudeCodeService(_providerSettings),
+        _ => new CopilotService()
+    };
+
+    private async void SwitchProviderAsync(AiProvider provider)
+    {
+        if (_providerSettings.ActiveProvider == provider)
+            return;
+
+        try
+        {
+            // Dispose current service
+            await _aiService.DisposeAsync();
+
+            _providerSettings.ActiveProvider = provider;
+            _providerSettings.Save();
+
+            _aiService = CreateAiService(provider);
+
+            var providerName = _aiService.ProviderName;
+            Title = $"{providerName} Chat";
+            if (_notifyIcon != null)
+                _notifyIcon.Text = $"{providerName} Chat";
+
+            var switchMessage = new ChatMessage
+            {
+                Role = "system",
+                Content = $"Switched to {providerName}. Checking authentication...",
+                Timestamp = DateTime.Now,
+                AvatarImagePath = _copilotAvatarPath
+            };
+            AddMessage(switchMessage);
+
+            await CheckAuthenticationAsync();
+        }
+        catch (Exception ex)
+        {
+            AddMessage(new ChatMessage
+            {
+                Role = "system",
+                Content = $"Error switching provider: {ex.Message}",
+                Timestamp = DateTime.Now,
+                AvatarImagePath = _copilotAvatarPath
+            });
         }
     }
 

@@ -1,0 +1,64 @@
+using System;
+using System.IO;
+using System.Text.Json;
+
+namespace CopilotTaskbarApp;
+
+public enum AiProvider
+{
+    GitHubCopilot,
+    ClaudeCode
+}
+
+public enum ClaudeModel
+{
+    Sonnet,
+    Opus,
+    Haiku
+}
+
+public class AiProviderSettings
+{
+    public AiProvider ActiveProvider { get; set; } = AiProvider.GitHubCopilot;
+    public ClaudeModel ClaudeModel { get; set; } = ClaudeModel.Sonnet;
+    public bool ClaudeSkipPermissions { get; set; } = false;
+
+    private static readonly JsonSerializerOptions SerializerOptions = new() { WriteIndented = true };
+
+    private static readonly string SettingsPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "CopilotTaskbarApp",
+        "settings.json");
+
+    public static AiProviderSettings Load()
+    {
+        try
+        {
+            if (File.Exists(SettingsPath))
+            {
+                var json = File.ReadAllText(SettingsPath);
+                return JsonSerializer.Deserialize<AiProviderSettings>(json) ?? new AiProviderSettings();
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[AiProviderSettings] Failed to load: {ex.Message}");
+        }
+        return new AiProviderSettings();
+    }
+
+    public void Save()
+    {
+        try
+        {
+            var dir = Path.GetDirectoryName(SettingsPath)!;
+            Directory.CreateDirectory(dir);
+            var json = JsonSerializer.Serialize(this, SerializerOptions);
+            File.WriteAllText(SettingsPath, json);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[AiProviderSettings] Failed to save: {ex.Message}");
+        }
+    }
+}

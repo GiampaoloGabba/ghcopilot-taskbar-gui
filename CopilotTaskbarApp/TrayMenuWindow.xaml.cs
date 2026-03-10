@@ -58,13 +58,18 @@ public sealed partial class TrayMenuWindow : Window
     private static readonly nint WS_POPUP = unchecked((nint)0x80000000L);
 
     private readonly AppWindow _appWindow;
+    private readonly AiProviderSettings _settings;
     private bool _isAlwaysOnTopChecked;
     private bool _showTimestampsChecked;
+    private AiProvider _selectedProvider;
 
     public event Action? ShowChatRequested;
     public event Action? HideChatRequested;
     public event Action<bool>? AlwaysOnTopToggled;
     public event Action<bool>? ShowTimestampsToggled;
+    public event Action<AiProvider>? ProviderChanged;
+    public event Action<ClaudeModel>? ClaudeModelChanged;
+    public event Action<bool>? ClaudeSkipPermissionsToggled;
     public event Action? ExitRequested;
 
     public TrayMenuWindow()
@@ -106,6 +111,9 @@ public sealed partial class TrayMenuWindow : Window
         ExtendsContentIntoTitleBar = true;
         _appWindow.IsShownInSwitchers = false;
 
+        _settings = AiProviderSettings.Load();
+        _selectedProvider = _settings.ActiveProvider;
+
         this.Activated += OnActivated;
 
         BuildMenu();
@@ -118,6 +126,65 @@ public sealed partial class TrayMenuWindow : Window
 
         AddMenuItem("\uE8A7", "Show Chat", () => { Hide(); ShowChatRequested?.Invoke(); });
         AddMenuItem("\uE76B", "Hide Chat", () => { Hide(); HideChatRequested?.Invoke(); });
+        AddSeparator();
+
+        // AI Provider selection (radio-style)
+        AddRadioMenuItem("\uE99A", "GitHub Copilot", _selectedProvider == AiProvider.GitHubCopilot, () =>
+        {
+            if (_selectedProvider != AiProvider.GitHubCopilot)
+            {
+                _selectedProvider = AiProvider.GitHubCopilot;
+                Hide();
+                ProviderChanged?.Invoke(AiProvider.GitHubCopilot);
+            }
+        });
+        AddRadioMenuItem("\uE945", "Claude Code", _selectedProvider == AiProvider.ClaudeCode, () =>
+        {
+            if (_selectedProvider != AiProvider.ClaudeCode)
+            {
+                _selectedProvider = AiProvider.ClaudeCode;
+                Hide();
+                ProviderChanged?.Invoke(AiProvider.ClaudeCode);
+            }
+        });
+
+        // Claude-specific options (only visible when Claude is selected)
+        if (_selectedProvider == AiProvider.ClaudeCode)
+        {
+            AddSeparator();
+
+            // Model selection submenu
+            AddSubLabel("Model");
+            AddRadioMenuItem("\uE943", "Sonnet", _settings.ClaudeModel == ClaudeModel.Sonnet, () =>
+            {
+                _settings.ClaudeModel = ClaudeModel.Sonnet;
+                _settings.Save();
+                Hide();
+                ClaudeModelChanged?.Invoke(ClaudeModel.Sonnet);
+            });
+            AddRadioMenuItem("\uE943", "Opus", _settings.ClaudeModel == ClaudeModel.Opus, () =>
+            {
+                _settings.ClaudeModel = ClaudeModel.Opus;
+                _settings.Save();
+                Hide();
+                ClaudeModelChanged?.Invoke(ClaudeModel.Opus);
+            });
+            AddRadioMenuItem("\uE943", "Haiku", _settings.ClaudeModel == ClaudeModel.Haiku, () =>
+            {
+                _settings.ClaudeModel = ClaudeModel.Haiku;
+                _settings.Save();
+                Hide();
+                ClaudeModelChanged?.Invoke(ClaudeModel.Haiku);
+            });
+
+            AddToggleMenuItem("\uE785", "Skip Permissions", _settings.ClaudeSkipPermissions, isChecked =>
+            {
+                _settings.ClaudeSkipPermissions = isChecked;
+                _settings.Save();
+                ClaudeSkipPermissionsToggled?.Invoke(isChecked);
+            });
+        }
+
         AddSeparator();
 
         AddToggleMenuItem("\uE718", "Always on Top", _isAlwaysOnTopChecked, isChecked =>
@@ -229,6 +296,72 @@ public sealed partial class TrayMenuWindow : Window
         MenuItems.Children.Add(btn);
     }
 
+    private void AddRadioMenuItem(string glyph, string label, bool isSelected, Action action)
+    {
+        var btn = new Button
+        {
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Left,
+            Background = new SolidColorBrush(Windows.UI.Color.FromArgb(0, 0, 0, 0)),
+            BorderThickness = new Thickness(0),
+            CornerRadius = (CornerRadius)Application.Current.Resources["ControlCornerRadius"],
+            Padding = new Thickness(10, 6, 10, 6),
+        };
+
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Auto) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Auto) });
+
+        var icon = new FontIcon
+        {
+            Glyph = glyph,
+            FontSize = (double)Application.Current.Resources["ControlContentThemeFontSize"],
+            Foreground = (Brush)Application.Current.Resources["TextFillColorPrimaryBrush"],
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 10, 0)
+        };
+        Grid.SetColumn(icon, 0);
+
+        var text = new TextBlock
+        {
+            Text = label,
+            Style = (Style)Application.Current.Resources["BodyTextBlockStyle"],
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(text, 1);
+
+        var checkIcon = new FontIcon
+        {
+            Glyph = "\uECCC", // RadioBullet glyph
+            FontSize = 12,
+            Foreground = (Brush)Application.Current.Resources["SystemControlHighlightAccentBrush"],
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(10, 0, 0, 0),
+            Visibility = isSelected ? Visibility.Visible : Visibility.Collapsed
+        };
+        Grid.SetColumn(checkIcon, 2);
+
+        grid.Children.Add(icon);
+        grid.Children.Add(text);
+        grid.Children.Add(checkIcon);
+
+        btn.Content = grid;
+        btn.Click += (s, e) => action();
+        MenuItems.Children.Add(btn);
+    }
+
+    private void AddSubLabel(string label)
+    {
+        MenuItems.Children.Add(new TextBlock
+        {
+            Text = label,
+            FontSize = 11,
+            Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+            Margin = new Thickness(12, 4, 0, 0)
+        });
+    }
+
     private void AddSeparator()
     {
         MenuItems.Children.Add(new Border
@@ -286,6 +419,7 @@ public sealed partial class TrayMenuWindow : Window
             var child = MenuItems.Children[i];
             if (child is Button) height += 32;
             else if (child is Border) height += 7;
+            else if (child is TextBlock) height += 22;
             if (i < childCount - 1) height += 1; // StackPanel.Spacing
         }
         return height;
