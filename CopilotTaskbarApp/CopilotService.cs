@@ -10,6 +10,7 @@ namespace CopilotTaskbarApp;
 public class CopilotService : IAsyncDisposable
 {
     private readonly CopilotClient _client;
+    private readonly SemaphoreSlim _startLock = new(1, 1);
     private bool _isStarted;
 
     public CopilotService()
@@ -19,8 +20,19 @@ public class CopilotService : IAsyncDisposable
 
     private async Task EnsureStartedAsync(CancellationToken cancellationToken = default)
     {
-        if (!_isStarted)
+        if (_isStarted)
         {
+            return;
+        }
+
+        await _startLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (_isStarted)
+            {
+                return;
+            }
+
             try
             {
                 await _client.StartAsync(cancellationToken).ConfigureAwait(false);
@@ -30,6 +42,10 @@ public class CopilotService : IAsyncDisposable
             {
                 throw new Exception($"Failed to start Copilot. Ensure you're authenticated with GitHub.\n\nDetails: {ex.Message}", ex);
             }
+        }
+        finally
+        {
+            _startLock.Release();
         }
     }
 
@@ -114,7 +130,7 @@ public class CopilotService : IAsyncDisposable
             
             // Use event-based API (SDK v0.1.32): subscribe to events, then send
             var responseContent = "";
-            var done = new TaskCompletionSource<string>();
+            var done = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             using var subscription = session.On(evt =>
             {
@@ -200,6 +216,8 @@ public class CopilotService : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        _startLock.Dispose();
+
         if (_isStarted)
         {
             await _client.StopAsync().ConfigureAwait(false);
