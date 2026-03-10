@@ -7,8 +7,9 @@ using GitHub.Copilot.SDK;
 
 namespace CopilotTaskbarApp;
 
-public class CopilotService : IAsyncDisposable
+public class CopilotService : IAiService
 {
+    public string ProviderName => "GitHub Copilot";
     private readonly CopilotClient _client;
     private readonly SemaphoreSlim _startLock = new(1, 1);
     private bool _isStarted;

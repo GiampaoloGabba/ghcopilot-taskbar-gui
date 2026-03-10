@@ -28,14 +28,14 @@ public class CopilotCliDetector
             }
 
             await process.WaitForExitAsync();
-            
+
             if (process.ExitCode == 0)
             {
                 var version = await process.StandardOutput.ReadToEndAsync();
-                return new CopilotCliStatus 
-                { 
-                    IsInstalled = true, 
-                    Version = version.Trim() 
+                return new CopilotCliStatus
+                {
+                    IsInstalled = true,
+                    Version = version.Trim()
                 };
             }
 
@@ -48,10 +48,58 @@ public class CopilotCliDetector
         }
         catch (Exception ex)
         {
-            return new CopilotCliStatus 
-            { 
-                IsInstalled = false, 
-                Error = ex.Message 
+            return new CopilotCliStatus
+            {
+                IsInstalled = false,
+                Error = ex.Message
+            };
+        }
+    }
+
+    public static async Task<CopilotCliStatus> CheckClaudeCodeCliAsync()
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "claude",
+                Arguments = "--version",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = Process.Start(psi);
+            if (process == null)
+            {
+                return CopilotCliStatus.NotInstalled;
+            }
+
+            await process.WaitForExitAsync();
+
+            if (process.ExitCode == 0)
+            {
+                var version = await process.StandardOutput.ReadToEndAsync();
+                return new CopilotCliStatus
+                {
+                    IsInstalled = true,
+                    Version = version.Trim()
+                };
+            }
+
+            return CopilotCliStatus.NotInstalled;
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            return CopilotCliStatus.NotInstalled;
+        }
+        catch (Exception ex)
+        {
+            return new CopilotCliStatus
+            {
+                IsInstalled = false,
+                Error = ex.Message
             };
         }
     }
@@ -80,6 +128,30 @@ public class CopilotCliDetector
         }
     }
 
+    public static async Task<bool> InstallClaudeCodeCliAsync()
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "npm",
+                Arguments = "install -g @anthropic-ai/claude-code",
+                UseShellExecute = true,
+                CreateNoWindow = false
+            };
+
+            using var process = Process.Start(psi);
+            if (process == null) return false;
+
+            await process.WaitForExitAsync();
+            return process.ExitCode == 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public static async Task<bool> IsWingetAvailableAsync()
     {
         try
@@ -87,6 +159,32 @@ public class CopilotCliDetector
             var psi = new ProcessStartInfo
             {
                 FileName = "winget",
+                Arguments = "--version",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = Process.Start(psi);
+            if (process == null) return false;
+
+            await process.WaitForExitAsync();
+            return process.ExitCode == 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public static async Task<bool> IsNpmAvailableAsync()
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "npm",
                 Arguments = "--version",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,

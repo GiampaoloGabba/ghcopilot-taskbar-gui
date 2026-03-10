@@ -60,11 +60,13 @@ public sealed partial class TrayMenuWindow : Window
     private readonly AppWindow _appWindow;
     private bool _isAlwaysOnTopChecked;
     private bool _showTimestampsChecked;
+    private AiProvider _selectedProvider;
 
     public event Action? ShowChatRequested;
     public event Action? HideChatRequested;
     public event Action<bool>? AlwaysOnTopToggled;
     public event Action<bool>? ShowTimestampsToggled;
+    public event Action<AiProvider>? ProviderChanged;
     public event Action? ExitRequested;
 
     public TrayMenuWindow()
@@ -106,6 +108,8 @@ public sealed partial class TrayMenuWindow : Window
         ExtendsContentIntoTitleBar = true;
         _appWindow.IsShownInSwitchers = false;
 
+        _selectedProvider = AiProviderSettings.Load().ActiveProvider;
+
         this.Activated += OnActivated;
 
         BuildMenu();
@@ -118,6 +122,28 @@ public sealed partial class TrayMenuWindow : Window
 
         AddMenuItem("\uE8A7", "Show Chat", () => { Hide(); ShowChatRequested?.Invoke(); });
         AddMenuItem("\uE76B", "Hide Chat", () => { Hide(); HideChatRequested?.Invoke(); });
+        AddSeparator();
+
+        // AI Provider selection (radio-style)
+        AddRadioMenuItem("\uE99A", "GitHub Copilot", _selectedProvider == AiProvider.GitHubCopilot, () =>
+        {
+            if (_selectedProvider != AiProvider.GitHubCopilot)
+            {
+                _selectedProvider = AiProvider.GitHubCopilot;
+                Hide();
+                ProviderChanged?.Invoke(AiProvider.GitHubCopilot);
+            }
+        });
+        AddRadioMenuItem("\uE945", "Claude Code", _selectedProvider == AiProvider.ClaudeCode, () =>
+        {
+            if (_selectedProvider != AiProvider.ClaudeCode)
+            {
+                _selectedProvider = AiProvider.ClaudeCode;
+                Hide();
+                ProviderChanged?.Invoke(AiProvider.ClaudeCode);
+            }
+        });
+
         AddSeparator();
 
         AddToggleMenuItem("\uE718", "Always on Top", _isAlwaysOnTopChecked, isChecked =>
@@ -226,6 +252,61 @@ public sealed partial class TrayMenuWindow : Window
             onToggle(newState);
         };
 
+        MenuItems.Children.Add(btn);
+    }
+
+    private void AddRadioMenuItem(string glyph, string label, bool isSelected, Action action)
+    {
+        var btn = new Button
+        {
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Left,
+            Background = new SolidColorBrush(Windows.UI.Color.FromArgb(0, 0, 0, 0)),
+            BorderThickness = new Thickness(0),
+            CornerRadius = (CornerRadius)Application.Current.Resources["ControlCornerRadius"],
+            Padding = new Thickness(10, 6, 10, 6),
+        };
+
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Auto) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Auto) });
+
+        var icon = new FontIcon
+        {
+            Glyph = glyph,
+            FontSize = (double)Application.Current.Resources["ControlContentThemeFontSize"],
+            Foreground = (Brush)Application.Current.Resources["TextFillColorPrimaryBrush"],
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 10, 0)
+        };
+        Grid.SetColumn(icon, 0);
+
+        var text = new TextBlock
+        {
+            Text = label,
+            Style = (Style)Application.Current.Resources["BodyTextBlockStyle"],
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        Grid.SetColumn(text, 1);
+
+        var checkIcon = new FontIcon
+        {
+            Glyph = "\uECCC", // RadioBullet glyph
+            FontSize = 12,
+            Foreground = (Brush)Application.Current.Resources["SystemControlHighlightAccentBrush"],
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(10, 0, 0, 0),
+            Visibility = isSelected ? Visibility.Visible : Visibility.Collapsed
+        };
+        Grid.SetColumn(checkIcon, 2);
+
+        grid.Children.Add(icon);
+        grid.Children.Add(text);
+        grid.Children.Add(checkIcon);
+
+        btn.Content = grid;
+        btn.Click += (s, e) => action();
         MenuItems.Children.Add(btn);
     }
 
