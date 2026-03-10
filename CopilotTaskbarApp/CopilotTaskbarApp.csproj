@@ -2,13 +2,12 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net11.0-windows10.0.19041.0</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <UseWinUI>true</UseWinUI>
     <EnableMsixTooling>true</EnableMsixTooling>
-    <Configurations>Debug;Release;Debug-Net10;Release-Net10</Configurations>
     <Platforms>x64;ARM64</Platforms>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
     <SelfContained>true</SelfContained>
@@ -16,21 +15,9 @@
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <PublishAot>false</PublishAot>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <PublishTrimmed>true</PublishTrimmed>
-    <TrimMode>partial</TrimMode>
     <TieredCompilation>true</TieredCompilation>
     <TieredPGO>true</TieredPGO>
     <GarbageCollectionAdaptationMode>1</GarbageCollectionAdaptationMode>
-  </PropertyGroup>
-
-  <!-- .NET 10 configurations: override TFM and disable trimming -->
-  <PropertyGroup Condition="$(Configuration.EndsWith('-Net10'))">
-    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
-    <PublishTrimmed>false</PublishTrimmed>
-    <TrimMode></TrimMode>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)'=='Release-Net10'">
-    <Optimize>True</Optimize>
   </PropertyGroup>
 
   <ItemGroup>
