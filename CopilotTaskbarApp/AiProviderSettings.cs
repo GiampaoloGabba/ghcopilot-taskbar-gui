@@ -1,7 +1,6 @@
 using System;
 using System.IO;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace CopilotTaskbarApp;
 
@@ -23,6 +22,8 @@ public class AiProviderSettings
     public AiProvider ActiveProvider { get; set; } = AiProvider.GitHubCopilot;
     public ClaudeModel ClaudeModel { get; set; } = ClaudeModel.Sonnet;
     public bool ClaudeSkipPermissions { get; set; } = false;
+
+    private static readonly JsonSerializerOptions SerializerOptions = new() { WriteIndented = true };
 
     private static readonly string SettingsPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -52,7 +53,7 @@ public class AiProviderSettings
         {
             var dir = Path.GetDirectoryName(SettingsPath)!;
             Directory.CreateDirectory(dir);
-            var json = JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true });
+            var json = JsonSerializer.Serialize(this, SerializerOptions);
             File.WriteAllText(SettingsPath, json);
         }
         catch (Exception ex)

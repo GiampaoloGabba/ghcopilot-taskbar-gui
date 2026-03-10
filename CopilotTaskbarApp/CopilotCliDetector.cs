@@ -27,11 +27,12 @@ public class CopilotCliDetector
                 return CopilotCliStatus.NotInstalled;
             }
 
+            var outputTask = process.StandardOutput.ReadToEndAsync();
             await process.WaitForExitAsync();
 
             if (process.ExitCode == 0)
             {
-                var version = await process.StandardOutput.ReadToEndAsync();
+                var version = await outputTask;
                 return new CopilotCliStatus
                 {
                     IsInstalled = true,
@@ -76,11 +77,12 @@ public class CopilotCliDetector
                 return CopilotCliStatus.NotInstalled;
             }
 
+            var outputTask = process.StandardOutput.ReadToEndAsync();
             await process.WaitForExitAsync();
 
             if (process.ExitCode == 0)
             {
-                var version = await process.StandardOutput.ReadToEndAsync();
+                var version = await outputTask;
                 return new CopilotCliStatus
                 {
                     IsInstalled = true,

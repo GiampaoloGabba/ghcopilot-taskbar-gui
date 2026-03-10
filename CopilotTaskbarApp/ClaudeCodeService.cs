@@ -114,7 +114,7 @@ public class ClaudeCodeService : IAiService
             {
                 System.Diagnostics.Debug.WriteLine($"[ClaudeCodeService] STDERR: {error}");
 
-                var errorLower = (error ?? "").ToLower();
+                var errorLower = (error ?? "").ToLowerInvariant();
                 if (errorLower.Contains("auth") || errorLower.Contains("api key") || errorLower.Contains("unauthorized"))
                 {
                     return "Authentication required for Claude Code.\n\n" +
@@ -159,24 +159,20 @@ public class ClaudeCodeService : IAiService
             var psi = new ProcessStartInfo
             {
                 FileName = "claude",
+                Arguments = "--version",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
-            psi.ArgumentList.Add("-p");
-            psi.ArgumentList.Add("--max-turns");
-            psi.ArgumentList.Add("1");
-            psi.ArgumentList.Add("--no-session-persistence");
-            psi.ArgumentList.Add("--output-format");
-            psi.ArgumentList.Add("text");
-            psi.ArgumentList.Add("Say OK");
 
             using var process = Process.Start(psi);
             if (process == null) return false;
 
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             await process.WaitForExitAsync(cts.Token).ConfigureAwait(false);
+            await outputTask.ConfigureAwait(false);
             return process.ExitCode == 0;
         }
         catch

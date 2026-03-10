@@ -894,34 +894,47 @@ public sealed partial class MainWindow : Window
         _ => new CopilotService()
     };
 
-    public async void SwitchProviderAsync(AiProvider provider)
+    private async void SwitchProviderAsync(AiProvider provider)
     {
         if (_providerSettings.ActiveProvider == provider)
             return;
 
-        // Dispose current service
-        await _aiService.DisposeAsync();
-
-        _providerSettings.ActiveProvider = provider;
-        _providerSettings.Save();
-
-        _aiService = CreateAiService(provider);
-
-        var providerName = _aiService.ProviderName;
-        Title = $"{providerName} Chat";
-        if (_notifyIcon != null)
-            _notifyIcon.Text = $"{providerName} Chat";
-
-        var switchMessage = new ChatMessage
+        try
         {
-            Role = "system",
-            Content = $"Switched to {providerName}. Checking authentication...",
-            Timestamp = DateTime.Now,
-            AvatarImagePath = _copilotAvatarPath
-        };
-        AddMessage(switchMessage);
+            // Dispose current service
+            await _aiService.DisposeAsync();
 
-        await CheckAuthenticationAsync();
+            _providerSettings.ActiveProvider = provider;
+            _providerSettings.Save();
+
+            _aiService = CreateAiService(provider);
+
+            var providerName = _aiService.ProviderName;
+            Title = $"{providerName} Chat";
+            if (_notifyIcon != null)
+                _notifyIcon.Text = $"{providerName} Chat";
+
+            var switchMessage = new ChatMessage
+            {
+                Role = "system",
+                Content = $"Switched to {providerName}. Checking authentication...",
+                Timestamp = DateTime.Now,
+                AvatarImagePath = _copilotAvatarPath
+            };
+            AddMessage(switchMessage);
+
+            await CheckAuthenticationAsync();
+        }
+        catch (Exception ex)
+        {
+            AddMessage(new ChatMessage
+            {
+                Role = "system",
+                Content = $"Error switching provider: {ex.Message}",
+                Timestamp = DateTime.Now,
+                AvatarImagePath = _copilotAvatarPath
+            });
+        }
     }
 
     private static string NormalizeAssistantResponse(string? response)

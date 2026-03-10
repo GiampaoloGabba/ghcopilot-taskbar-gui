@@ -188,7 +188,7 @@ public class CopilotService : IAiService
             System.Diagnostics.Debug.WriteLine($"[CopilotService] ERROR after {totalElapsed.TotalSeconds:F2}s: {ex.GetType().Name}");
             System.Diagnostics.Debug.WriteLine($"[CopilotService] {ex.Message}");
             
-            var message = ex.Message.ToLower();
+            var message = ex.Message.ToLowerInvariant();
             if (message.Contains("auth") || message.Contains("login") || message.Contains("unauthorized"))
             {
                 return "Authentication required.\n\n" +
