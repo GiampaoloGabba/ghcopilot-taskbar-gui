@@ -185,6 +185,15 @@ public sealed partial class MainWindow : Window
         catch { }
     }
 
+    private async void NewChat_Click(object sender, RoutedEventArgs e)
+    {
+        _messages.Clear();
+        _commandHistory.Clear();
+        _historyIndex = -1;
+        _currentInput = "";
+        try { await _persistenceService.ClearHistoryAsync(); } catch { }
+    }
+
     private void MinimizeButton_Click(object sender, RoutedEventArgs e)
     {
         HideMainWindow();

@@ -85,14 +85,35 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
             <TextBlock Text="GitHub Copilot"
                        Style="{StaticResource FlyoutHeaderTextStyle}"
                        VerticalAlignment="Center"
                        Margin="0,12,0,12"/>
-           
-            <Button Grid.Column="1" 
+
+            <Button Grid.Column="1"
+                    Click="NewChat_Click"
+                    Background="Transparent"
+                    BorderThickness="0"
+                    Width="40" Height="40"
+                    CornerRadius="0"
+                    IsTabStop="False"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center"
+                    Margin="0,4,0,4"
+                    ToolTipService.ToolTip="New Chat">
+                <Button.Content>
+                    <FontIcon Glyph="&#xE70F;" FontSize="12"/>
+                </Button.Content>
+                <Button.Resources>
+                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="{ThemeResource SystemListLowColor}"/>
+                    <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="{ThemeResource SystemListMediumColor}"/>
+                </Button.Resources>
+            </Button>
+
+            <Button Grid.Column="2"
                     Click="MinimizeButton_Click"
                     Background="Transparent"
                     BorderThickness="0"
